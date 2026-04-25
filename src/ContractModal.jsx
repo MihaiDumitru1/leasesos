@@ -67,12 +67,13 @@ export default function ContractModal({ open, onClose, editing, onSaved }) {
         await addDoc(collection(db, 'leases'), payload)
         showToast('Contract creat!', 'ok')
       }
+      setLoading(false)
       onSaved()
       onClose()
     } catch (e) {
       setError('Eroare: ' + e.message)
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   if (!open) return null
@@ -92,13 +93,11 @@ export default function ContractModal({ open, onClose, editing, onSaved }) {
       }}>
         <style>{`@keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}`}</style>
 
-        {/* Header */}
         <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1 }}>
           <span style={{ fontSize: 15, fontWeight: 500 }}>{editing ? 'Editează contract' : 'Contract nou'}</span>
           <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--border)', background: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--t2)' }}>✕</button>
         </div>
 
-        {/* Body */}
         <div style={{ padding: 24 }}>
           <Grid>
             <Field label="Nr. contract"><input value={form.contract_no} onChange={e => set('contract_no', e.target.value)} /></Field>
@@ -141,7 +140,6 @@ export default function ContractModal({ open, onClose, editing, onSaved }) {
           {error && <div className="err-box">{error}</div>}
         </div>
 
-        {/* Footer */}
         <div style={{ padding: '14px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, position: 'sticky', bottom: 0, background: 'var(--surface)' }}>
           <button className="btn" onClick={onClose}>Anulează</button>
           <button className="btn btn-p" onClick={handleSave} disabled={loading}>
