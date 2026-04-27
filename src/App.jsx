@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import React, { useState, useEffect, useCallback } from 'react'
 import { db } from './firebase'
 import { collection, getDocs, query, orderBy } from 'firebase/firestore'
 import Sidebar from './Sidebar'
@@ -13,13 +12,12 @@ import Payments from './pages/Payments'
 import Reports from './pages/Reports'
 
 const PAGE_TITLES = {
-  '/': 'Dashboard', '/contracts': 'Contracte', '/tenants': 'Chiriași',
-  '/payments': 'Plăți', '/reports': 'Rapoarte',
+  dash: 'Dashboard', contracts: 'Contracte', tenants: 'Chiriași',
+  payments: 'Plăți', reports: 'Rapoarte',
 }
 
-function AppInner() {
-  const navigate = useNavigate()
-  const location = useLocation()
+export default function App() {
+  const [page, setPageState] = useState('dash')
   const [leases, setLeases] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -31,6 +29,25 @@ function AppInner() {
     const handler = () => setIsMobile(window.innerWidth < 769)
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
+  }, [])
+
+  // Sync navigare cu browser history — fix buton Back pe mobile
+  useEffect(() => {
+    window.history.replaceState({ page: 'dash' }, '', '#dash')
+    const handlePopState = (e) => {
+      const p = e.state?.page || 'dash'
+      setPageState(p)
+      setDetailLease(null)
+      setModalOpen(false)
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  const setPage = useCallback((newPage) => {
+    window.history.pushState({ page: newPage }, '', '#' + newPage)
+    setPageState(newPage)
+    setDetailLease(null)
   }, [])
 
   useEffect(() => { loadLeases() }, [])
@@ -57,31 +74,13 @@ function AppInner() {
     setModalOpen(true)
   }
 
-  // Map location to page id for MobileNav/Sidebar
-  const pathToPage = {
-    '/': 'dash', '/contracts': 'contracts', '/tenants': 'tenants',
-    '/payments': 'payments', '/reports': 'reports',
-  }
-  const pageToPath = {
-    'dash': '/', 'contracts': '/contracts', 'tenants': '/tenants',
-    'payments': '/payments', 'reports': '/reports',
-  }
-  const currentPage = pathToPage[location.pathname] || 'dash'
-  const title = PAGE_TITLES[location.pathname] || 'Dashboard'
   const expiringCount = leases.filter(l => l.status === 'expiring').length
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {!isMobile && (
-        <Sidebar
-          page={currentPage}
-          setPage={p => navigate(pageToPath[p])}
-          onNewContract={openNewContract}
-        />
-      )}
+      {!isMobile && <Sidebar page={page} setPage={setPage} onNewContract={openNewContract} />}
 
       <div style={{ marginLeft: isMobile ? 0 : 220, flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-        {/* Topbar */}
         <div style={{
           background: 'var(--surface)', borderBottom: '1px solid var(--border)',
           height: 52, padding: '0 20px', display: 'flex', alignItems: 'center',
@@ -89,18 +88,16 @@ function AppInner() {
         }}>
           <div style={{ fontSize: 13, color: 'var(--t2)', display: 'flex', alignItems: 'center', gap: 6 }}>
             {isMobile && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 4 }}>
-                <div style={{ width: 24, height: 24, background: 'var(--green)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
-                    <rect x="2" y="2" width="6" height="7" rx="1.5" fill="white"/>
-                    <rect x="10" y="2" width="6" height="4" rx="1.5" fill="white"/>
-                    <rect x="10" y="9" width="6" height="7" rx="1.5" fill="white"/>
-                    <rect x="2" y="12" width="6" height="4" rx="1.5" fill="white"/>
-                  </svg>
-                </div>
+              <div style={{ width: 24, height: 24, background: 'var(--green)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 6 }}>
+                <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
+                  <rect x="2" y="2" width="6" height="7" rx="1.5" fill="white"/>
+                  <rect x="10" y="2" width="6" height="4" rx="1.5" fill="white"/>
+                  <rect x="10" y="9" width="6" height="7" rx="1.5" fill="white"/>
+                  <rect x="2" y="12" width="6" height="4" rx="1.5" fill="white"/>
+                </svg>
               </div>
             )}
-            LeaseOS › <strong style={{ color: 'var(--text)', fontWeight: 500 }}>{title}</strong>
+            LeaseOS › <strong style={{ color: 'var(--text)', fontWeight: 500 }}>{PAGE_TITLES[page]}</strong>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {expiringCount > 0 && !isMobile && (
@@ -114,58 +111,32 @@ function AppInner() {
           </div>
         </div>
 
-        {/* Page content */}
         <div style={{ padding: isMobile ? '16px 14px' : 24, flex: 1, paddingBottom: isMobile ? 76 : 24 }}>
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--t3)' }}>
               Se încarcă...
             </div>
           ) : (
-            <Routes>
-              <Route path="/" element={<Dashboard leases={leases} onRowClick={setDetailLease} onNewContract={openNewContract} />} />
-              <Route path="/contracts" element={<Contracts leases={leases} onRowClick={setDetailLease} onNewContract={openNewContract} />} />
-              <Route path="/tenants" element={<Tenants leases={leases} />} />
-              <Route path="/payments" element={<Payments leases={leases} />} />
-              <Route path="/reports" element={<Reports leases={leases} />} />
-            </Routes>
+            <>
+              {page === 'dash' && <Dashboard leases={leases} onRowClick={setDetailLease} onNewContract={openNewContract} isMobile={isMobile} />}
+              {page === 'contracts' && <Contracts leases={leases} onRowClick={setDetailLease} onNewContract={openNewContract} />}
+              {page === 'tenants' && <Tenants leases={leases} />}
+              {page === 'payments' && <Payments leases={leases} />}
+              {page === 'reports' && <Reports leases={leases} />}
+            </>
           )}
         </div>
       </div>
 
-      {isMobile && (
-        <MobileNav
-          page={currentPage}
-          setPage={p => navigate(pageToPath[p])}
-          onNew={openNewContract}
-        />
-      )}
+      {isMobile && <MobileNav page={page} setPage={setPage} onNew={openNewContract} />}
 
-      <ContractModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        editing={editing}
-        onSaved={loadLeases}
-      />
+      <ContractModal open={modalOpen} onClose={() => setModalOpen(false)} editing={editing} onSaved={loadLeases} />
 
       {detailLease && (
-        <DetailPanel
-          lease={detailLease}
-          onClose={() => setDetailLease(null)}
-          onEdit={() => openEdit(detailLease)}
-          onDeleted={loadLeases}
-        />
+        <DetailPanel lease={detailLease} onClose={() => setDetailLease(null)} onEdit={() => openEdit(detailLease)} onDeleted={loadLeases} />
       )}
 
       <div id="toast" className="toast" />
     </div>
   )
 }
-
-export default function App() {
-  return (
-    <BrowserRouter>
-      <AppInner />
-    </BrowserRouter>
-  )
-}
-
